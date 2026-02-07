@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Suzuki AI Generator</title>
   <script src="https://js.puter.com/v2/"></script>
-  <script src="https://js.stripe.com/v3/"></script>
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -291,6 +290,8 @@
       cursor: pointer;
       margin: 10px 0;
       transition: transform 0.2s;
+      text-decoration: none;
+      display: inline-block;
     }
     .subscribe-btn:hover {
       transform: scale(1.05);
@@ -347,6 +348,16 @@
       margin-bottom: 15px;
       font-size: 0.95em;
     }
+
+    .payment-info {
+      background: #f0f8ff;
+      border: 2px solid #0066cc;
+      border-radius: 10px;
+      padding: 15px;
+      margin: 15px 0;
+      font-size: 0.9em;
+      color: #0066cc;
+    }
   </style>
 </head>
 <body>
@@ -355,7 +366,7 @@
     <div class="modal-content">
       <div class="premium-badge">⭐ PREMIUM</div>
       <div class="modal-header">Upgrade to Pro</div>
-      <p style="color: #666; margin-bottom: 20px;">Unlock unlimited AI generations!</p>
+      <p style="color: #666; margin-bottom: 20px;">You've used all your free renders!</p>
       
       <div class="price-tag">
         $5<span>/month</span>
@@ -370,13 +381,14 @@
         <li>Save history & favorites</li>
       </ul>
       
-      <button class="subscribe-btn" onclick="redirectToStripe()">
+      <a href="https://buy.stripe.com/test_eVq3cv13Tfi21v14Q54ko00" class="subscribe-btn" target="_blank" onclick="handleStripeRedirect()">
         Subscribe with Stripe - $5/month
-      </button>
+      </a>
       
-      <p style="font-size: 0.8em; color: #999; margin-top: 10px;">
-        Secure payment processing by Stripe
-      </p>
+      <div class="payment-info">
+        🔒 Secure checkout powered by Stripe<br>
+        You'll be redirected to Stripe to complete payment
+      </div>
       
       <button class="close-modal" onclick="closeModal()">Maybe later</button>
     </div>
@@ -433,10 +445,12 @@
     <!-- Limit Reached Message -->
     <div id="limitMessage" class="limit-reached" style="display: none;">
       <h3>⛔ Limit Reached</h3>
-      <p>Upgrade to premium for unlimited renders!</p>
-      <button onclick="showSubscriptionModal()" style="margin-top: 10px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #1e3c72; font-weight: bold;">
-        Upgrade Now - $5/month
-      </button>
+      <p>You've used all 5 free renders!</p>
+      <a href="https://buy.stripe.com/test_eVq3cv13Tfi21v14Q54ko00" target="_blank" style="text-decoration: none;">
+        <button style="margin-top: 10px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #1e3c72; font-weight: bold; width: 100%;">
+          Upgrade Now - $5/month
+        </button>
+      </a>
     </div>
     
     <!-- Input Section (Only shown when logged in) -->
@@ -452,14 +466,14 @@
     <div id="result"></div>
     
     <div class="footer">
-      Powered by Suzuki AI Technology
+      Powered by Suzuki AI Technology | 
+      <a href="https://buy.stripe.com/test_eVq3cv13Tfi21v14Q54ko00" target="_blank" style="color: #667eea; font-weight: bold;">Upgrade to Premium</a>
     </div>
   </div>
 
   <script>
-    // Configuration - REPLACE WITH YOUR KEYS
-    const STRIPE_PUBLISHABLE_KEY = 'pk_test_YOUR_PUBLISHABLE_KEY_HERE';
-    const STRIPE_PRICE_ID = 'price_YOUR_PRICE_ID_HERE';
+    // Configuration
+    const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/test_eVq3cv13Tfi21v14Q54ko00';
     const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
     
     // Constants
@@ -487,7 +501,6 @@
     
     // Handle Google Sign In
     function handleGoogleSignIn(response) {
-      // Decode the JWT token
       const payload = JSON.parse(atob(response.credential.split('.')[1]));
       
       currentUser = {
@@ -498,12 +511,9 @@
         id_token: response.credential
       };
       
-      // Save session
       localStorage.setItem('suzukiai_current_user', JSON.stringify(currentUser));
       
-      // Show welcome message
       alert(`Welcome, ${currentUser.name}! You have ${MAX_FREE_RENDERS} free renders.`);
-      
       showLoggedInUI();
     }
     
@@ -514,12 +524,10 @@
       document.getElementById('inputGroup').style.display = 'flex';
       document.getElementById('counterDisplay').style.display = 'inline-flex';
       
-      // Update profile info
       document.getElementById('userName').textContent = currentUser.name;
       document.getElementById('userEmail').textContent = currentUser.email;
       document.getElementById('userAvatar').src = currentUser.picture;
       
-      // Initialize counter for this user
       initUserCounter();
     }
     
@@ -535,18 +543,12 @@
     // Handle Logout
     function handleLogout() {
       if (confirm('Are you sure you want to sign out?')) {
-        // Clear Google session
         google.accounts.id.disableAutoSelect();
-        
-        // Clear local storage
         localStorage.removeItem('suzukiai_current_user');
         currentUser = null;
-        
-        // Reset UI
         showLoggedOutUI();
         document.getElementById('result').innerHTML = '';
         document.getElementById('prompt').value = '';
-        
         alert('You have been signed out.');
       }
     }
@@ -615,27 +617,41 @@
       document.getElementById('subscriptionModal').classList.remove('active');
     }
     
-    function redirectToStripe() {
-      if (!currentUser) {
-        alert('Please sign in first!');
-        return;
+    function handleStripeRedirect() {
+      // Store that user initiated payment (check when they return)
+      if (currentUser) {
+        localStorage.setItem('suzukiai_pending_payment', currentUser.id);
       }
       
-      // Demo mode - In production, redirect to Stripe Checkout
-      alert('Redirecting to Stripe Checkout...\n\nTo set this up:\n1. Create a Stripe account at stripe.com\n2. Add your publishable key and price ID to the code\n3. Set up webhook to activate premium status');
+      // Close modal before redirect
+      closeModal();
       
-      // Simulate successful payment
-      if (confirm('Simulate successful payment? (Click OK to activate premium)')) {
-        const userKey = DB_PREFIX + currentUser.id;
-        const userData = JSON.parse(localStorage.getItem(userKey) || '{"rendersUsed": 0}');
-        userData.isPremium = true;
-        localStorage.setItem(userKey, JSON.stringify(userData));
-        
-        alert('🎉 Premium activated! You now have unlimited renders.');
-        closeModal();
-        initUserCounter();
-      }
+      // The actual redirect happens via the href on the <a> tag
+      // This function just handles any pre-redirect logic
+      console.log('Redirecting to Stripe:', STRIPE_PAYMENT_LINK);
     }
+    
+    // Check if user just returned from payment (simulated)
+    window.addEventListener('focus', function() {
+      const pendingPayment = localStorage.getItem('suzukiai_pending_payment');
+      if (pendingPayment && currentUser && pendingPayment === currentUser.id) {
+        // In production, you'd verify with your backend/webhook
+        // For demo purposes, we can simulate success after they return
+        localStorage.removeItem('suzukiai_pending_payment');
+        
+        // Optional: Show message asking if payment completed
+        setTimeout(() => {
+          if (confirm('Did you complete the payment? Click OK to activate premium (Demo only)')) {
+            const userKey = DB_PREFIX + currentUser.id;
+            const userData = JSON.parse(localStorage.getItem(userKey) || '{"rendersUsed": 0}');
+            userData.isPremium = true;
+            localStorage.setItem(userKey, JSON.stringify(userData));
+            alert('🎉 Premium activated! Enjoy unlimited renders.');
+            initUserCounter();
+          }
+        }, 1000);
+      }
+    });
     
     // Generate Image
     async function generate() {
