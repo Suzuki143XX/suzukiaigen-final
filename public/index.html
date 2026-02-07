@@ -415,7 +415,7 @@
       <p class="auth-text">Sign in with Google to start generating images</p>
       <!-- Google Sign-In Button -->
       <div id="g_id_onload"
-           data-client_id="YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+           data-client_id="420462376171-hpsgp580an2douisas893bqiki92ccsv.apps.googleusercontent.com"
            data-context="signin"
            data-ux_mode="popup"
            data-login_uri=""
@@ -472,9 +472,9 @@
   </div>
 
   <script>
-    // Configuration
+    // Configuration - YOUR ACTUAL GOOGLE CLIENT ID
+    const GOOGLE_CLIENT_ID = '420462376171-hpsgp580an2douisas893bqiki92ccsv.apps.googleusercontent.com';
     const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/test_eVq3cv13Tfi21v14Q54ko00';
-    const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
     
     // Constants
     const MAX_FREE_RENDERS = 5;
@@ -618,28 +618,19 @@
     }
     
     function handleStripeRedirect() {
-      // Store that user initiated payment (check when they return)
       if (currentUser) {
         localStorage.setItem('suzukiai_pending_payment', currentUser.id);
       }
-      
-      // Close modal before redirect
       closeModal();
-      
-      // The actual redirect happens via the href on the <a> tag
-      // This function just handles any pre-redirect logic
       console.log('Redirecting to Stripe:', STRIPE_PAYMENT_LINK);
     }
     
-    // Check if user just returned from payment (simulated)
+    // Check if user just returned from payment
     window.addEventListener('focus', function() {
       const pendingPayment = localStorage.getItem('suzukiai_pending_payment');
       if (pendingPayment && currentUser && pendingPayment === currentUser.id) {
-        // In production, you'd verify with your backend/webhook
-        // For demo purposes, we can simulate success after they return
         localStorage.removeItem('suzukiai_pending_payment');
         
-        // Optional: Show message asking if payment completed
         setTimeout(() => {
           if (confirm('Did you complete the payment? Click OK to activate premium (Demo only)')) {
             const userKey = DB_PREFIX + currentUser.id;
