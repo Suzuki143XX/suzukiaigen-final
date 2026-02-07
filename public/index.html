@@ -699,7 +699,7 @@
   <div class="main-container">
     <div class="hero">
       <h1>Create Stunning Visuals</h1>
-      <p>Professional-grade AI generation powered by Z-Image Turbo & Wan V2.2 I2V Turbo</p>
+      <p>Powered by Pollinations.AI - Free, Open-Source AI Generation</p>
     </div>
 
     <div class="glass-panel">
@@ -708,7 +708,7 @@
           <i class="fas fa-image"></i> Image Generation
         </button>
         <button class="mode-btn" id="vidModeBtn" onclick="switchMode('video')">
-          <i class="fas fa-video"></i> Video Generation (Wan I2V)
+          <i class="fas fa-video"></i> Video Generation (Seedance)
         </button>
       </div>
 
@@ -1004,17 +1004,12 @@
   </div>
 
   <script>
-    // API CONFIGURATION
-    // Z-Image Turbo (APIFree.ai) - For Images
-    const APIFREE_KEY = 'sk-pxz7h4Sap7M8t3aQ1HtyDF2kSCA6Y';
-    const APIFREE_BASE = 'https://api.apifree.ai';
+    // POLLINATIONS.AI API CONFIGURATION
+    // Completely free, no API keys required, open source
+    // Images: Uses Flux, Stable Diffusion, etc.
+    // Videos: Uses ByteDance Seedance, Veo
     
-    // WAN V2.2 A14B I2V TURBO (APIFree.ai) - For Videos
-    // Note: Wan I2V is Image-to-Video, so we generate an image first, then animate it
-    const WAN_API_KEY = 'sk-pxz7h4Sap7M8t3aQ1HtyDF2kSCA6Y';
-    const WAN_BASE = 'https://api.apifree.ai';
-    const WAN_MODEL = 'wan-v2.2-i2v-turbo'; // A14B I2V Turbo model
-    
+    const POLLINATIONS_BASE = 'https://image.pollinations.ai';
     const GOOGLE_CLIENT_ID = '420462376171-hpsgp580an2douisas893bqiki92ccsv.apps.googleusercontent.com';
     const FREE_IMAGE_LIMIT = 10;
     const FREE_VIDEO_LIMIT = 5;
@@ -1096,7 +1091,7 @@
         input.placeholder = 'Describe your image (e.g., A futuristic cyberpunk city at night)...';
       } else {
         btnText.innerHTML = 'Generate Video 🎬';
-        input.placeholder = 'Describe your video scene (e.g., A cinematic drone shot of mountains with flowing clouds)...';
+        input.placeholder = 'Describe your video scene (e.g., A cinematic drone shot of mountains)...';
       }
       checkLimits();
     }
@@ -1177,238 +1172,45 @@
           status: 'generating'
         };
 
+        // Build Pollinations URL
+        // For images: Default is Flux model, 1024x1024
+        // For videos: Use seedance model (ByteDance Seedance)
+        const encodedPrompt = encodeURIComponent(prompt);
+        const seed = Math.floor(Math.random() * 2147483647);
+        
+        let apiUrl;
+        
         if (currentMode === 'image') {
-          // Z-IMAGE TURBO (APIFREE.AI) IMPLEMENTATION
-          loadingText.textContent = 'Generating with Z-Image Turbo...';
-          loadingDetail.textContent = 'Submitting request...';
+          // Image generation using Flux (default) or other models
+          // Parameters: width, height, seed, model, nologo=true (to remove watermark)
+          loadingText.textContent = 'Generating image with Flux...';
+          loadingDetail.textContent = 'Connecting to Pollinations.AI...';
           
-          // Step 1: Submit generation request
-          const submitResponse = await fetch(`${APIFREE_BASE}/v1/image/submit`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${APIFREE_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model: "tongyi-mai/z-image-turbo",
-              prompt: prompt,
-              height: 1024,
-              width: 1024,
-              num_images: 1,
-              num_inference_steps: 8
-            })
-          });
-
-          if (!submitResponse.ok) {
-            const error = await submitResponse.text();
-            throw new Error(`API Error: ${error}`);
-          }
-
-          const submitData = await submitResponse.json();
+          apiUrl = `${POLLINATIONS_BASE}/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true&model=flux`;
           
-          if (submitData.code !== 200) {
-            throw new Error(submitData.error || submitData.code_msg || 'Failed to submit job');
-          }
-
-          const requestId = submitData.resp_data.request_id;
-          loadingDetail.textContent = `Request ID: ${requestId} - Processing...`;
-
-          // Step 2: Poll for result (every 2 seconds like Python example)
-          let attempts = 0;
-          const maxAttempts = 30; // 60 seconds max (2s * 30)
-          
-          while (attempts < maxAttempts) {
-            await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds
-            
-            loadingDetail.textContent = `Processing... ${attempts * 2}s elapsed`;
-            
-            const resultResponse = await fetch(`${APIFREE_BASE}/v1/image/${requestId}/result`, {
-              headers: {
-                'Authorization': `Bearer ${APIFREE_KEY}`
-              }
-            });
-
-            if (!resultResponse.ok) {
-              attempts++;
-              continue; // Retry on network error
-            }
-
-            const resultData = await resultResponse.json();
-            
-            if (resultData.code !== 200) {
-              throw new Error(resultData.code_msg || 'Failed to check status');
-            }
-
-            const status = resultData.resp_data.status;
-            
-            if (status === 'success') {
-              // Get first image URL
-              const imageUrl = resultData.resp_data.image_list[0];
-              creation.url = imageUrl;
-              creation.status = 'ready';
-              break;
-            } else if (status === 'error' || status === 'failed') {
-              throw new Error(resultData.resp_data.error || 'Generation failed');
-            }
-            // else status is 'processing', continue polling
-            
-            attempts++;
-          }
-          
-          if (!creation.url) {
-            throw new Error('Generation timeout - please try again');
-          }
-          
+          // Pollinations returns image directly, so we use the URL as the creation URL
+          creation.url = apiUrl;
+          creation.status = 'ready';
           data.imagesUsed++;
           
         } else {
-          // WAN V2.2 A14B I2V TURBO IMPLEMENTATION (APIFREE.AI)
-          // Since Wan I2V requires an image input, we generate the first frame using Z-Image Turbo,
-          // then use that image to generate the video
+          // Video generation using Seedance (ByteDance Seedance)
+          // Pollinations supports video via model=seedance or model=veo
+          loadingText.textContent = 'Generating video with Seedance...';
+          loadingDetail.textContent = 'This may take 30-60 seconds. Please wait...';
           
-          loadingText.textContent = 'Generating video with Wan V2.2 I2V Turbo...';
-          loadingDetail.textContent = 'Step 1/3: Creating first frame image...';
+          // Video parameters: model=seedance, duration (5-10s), aspect ratio
+          // Note: Video generation takes longer, so we add a delay/polling if needed
+          // But Pollinations returns a video URL directly for seedance model
+          apiUrl = `${POLLINATIONS_BASE}/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true&model=seedance&duration=5&aspect_ratio=16:9`;
           
-          // Step 1: Generate initial image using Z-Image Turbo for the first frame
-          const imgSubmitResponse = await fetch(`${APIFREE_BASE}/v1/image/submit`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${APIFREE_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model: "tongyi-mai/z-image-turbo",
-              prompt: prompt + ", high quality, cinematic composition, professional photography, detailed, 8k uhd", // Enhanced for better first frame
-              height: 1024,
-              width: 1024,
-              num_images: 1,
-              num_inference_steps: 12 // Slightly higher quality for video first frame
-            })
-          });
-
-          if (!imgSubmitResponse.ok) {
-            throw new Error('Failed to generate initial image for video');
-          }
-
-          const imgSubmitData = await imgSubmitResponse.json();
-          if (imgSubmitData.code !== 200) {
-            throw new Error(imgSubmitData.error || 'Image generation failed');
-          }
-
-          const imgRequestId = imgSubmitData.resp_data.request_id;
-          
-          // Poll for image result
-          let imgAttempts = 0;
-          let imageUrl = null;
-          
-          while (imgAttempts < 30) {
-            await new Promise(r => setTimeout(r, 2000));
-            loadingDetail.textContent = `Step 1/3: Generating first frame... (${imgAttempts * 2}s)`;
-            
-            const imgResultResponse = await fetch(`${APIFREE_BASE}/v1/image/${imgRequestId}/result`, {
-              headers: { 'Authorization': `Bearer ${APIFREE_KEY}` }
-            });
-            
-            if (!imgResultResponse.ok) {
-              imgAttempts++;
-              continue;
-            }
-            
-            const imgResultData = await imgResultResponse.json();
-            if (imgResultData.code === 200 && imgResultData.resp_data.status === 'success') {
-              imageUrl = imgResultData.resp_data.image_list[0];
-              break;
-            } else if (imgResultData.resp_data.status === 'error') {
-              throw new Error('First frame generation failed');
-            }
-            imgAttempts++;
-          }
-          
-          if (!imageUrl) {
-            throw new Error('Timeout generating first frame image');
-          }
-
-          loadingDetail.textContent = 'Step 2/3: Submitting video generation...';
-          
-          // Step 2: Submit video generation with the image to Wan I2V Turbo
-          const vidSubmitResponse = await fetch(`${WAN_BASE}/v1/video/submit`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${WAN_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model: WAN_MODEL,
-              prompt: prompt,
-              img_url: imageUrl, // First frame image required for I2V
-              parameters: {
-                resolution: "720P",
-                duration: 5,
-                prompt_extend: true,
-                seed: Math.floor(Math.random() * 2147483647) // Random seed for variety
-              }
-            })
-          });
-
-          if (!vidSubmitResponse.ok) {
-            const error = await vidSubmitResponse.text();
-            throw new Error(`Video API Error: ${error}`);
-          }
-
-          const vidSubmitData = await vidSubmitResponse.json();
-          if (vidSubmitData.code !== 200) {
-            throw new Error(vidSubmitData.error || vidSubmitData.code_msg || 'Failed to submit video job');
-          }
-
-          const vidRequestId = vidSubmitData.resp_data.request_id;
-          loadingDetail.textContent = `Step 3/3: Animating video... Request ID: ${vidRequestId}`;
-
-          // Step 3: Poll for video result (videos take longer, poll every 5 seconds)
-          let vidAttempts = 0;
-          const maxVidAttempts = 60; // 5 minutes max (5s * 60)
-          
-          while (vidAttempts < maxVidAttempts) {
-            await new Promise(r => setTimeout(r, 5000)); // Poll every 5 seconds for video
-            
-            const timeElapsed = vidAttempts * 5;
-            loadingDetail.textContent = `Step 3/3: Animating with Wan I2V... (${timeElapsed}s elapsed)`;
-            
-            const vidResultResponse = await fetch(`${WAN_BASE}/v1/video/${vidRequestId}/result`, {
-              headers: { 'Authorization': `Bearer ${WAN_API_KEY}` }
-            });
-
-            if (!vidResultResponse.ok) {
-              vidAttempts++;
-              continue;
-            }
-
-            const vidResultData = await vidResultResponse.json();
-            
-            if (vidResultData.code !== 200) {
-              throw new Error(vidResultData.code_msg || 'Failed to check video status');
-            }
-
-            const status = vidResultData.resp_data.status;
-            
-            if (status === 'success') {
-              // Get video URL - check both possible response formats
-              creation.url = vidResultData.resp_data.video_url || 
-                           (vidResultData.resp_data.video_list && vidResultData.resp_data.video_list[0]);
-              creation.status = 'ready';
-              break;
-            } else if (status === 'error' || status === 'failed') {
-              throw new Error(vidResultData.resp_data.error || 'Video generation failed');
-            }
-            
-            vidAttempts++;
-          }
-          
-          if (!creation.url) {
-            throw new Error('Video generation timeout - please try again (videos may take 2-5 minutes)');
-          }
-          
+          creation.url = apiUrl;
+          creation.status = 'ready';
           data.videosUsed++;
         }
+
+        // Simulate a brief delay to show loading state (optional, for UX)
+        await new Promise(r => setTimeout(r, currentMode === 'video' ? 3000 : 1500));
 
         saveUserData(data);
         updateCounters();
@@ -1460,9 +1262,10 @@
       grid.innerHTML = creations.map(item => `
         <div class="content-card" id="card-${item.id}">
           ${item.type === 'image' 
-            ? `<img src="${item.url}" class="card-media" alt="${item.prompt}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML+='<div style=\\'display:flex;align-items:center;justify-content:center;height:70%;color:#666;\\'>Image failed to load</div>';">`
+            ? `<img src="${item.url}" class="card-media" alt="${item.prompt}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML+='<div style=\\'display:flex;align-items:center;justify-content:center;height:70%;color:#666;\\'>Image failed to load. <br>Try refreshing or check your connection.</div>';">`
             : `<video class="card-media" controls poster="${item.url}" preload="none">
                  <source src="${item.url}" type="video/mp4">
+                 Your browser does not support the video tag.
                </video>`
           }
           <div class="card-actions">
@@ -1480,7 +1283,7 @@
             <p class="card-prompt">${escapeHtml(item.prompt)}</p>
             <div class="card-meta">
               <span>${new Date(item.timestamp).toLocaleDateString()}</span>
-              <span>${item.type === 'image' ? '⚡ Z-Image' : '🎬 Wan I2V Turbo'}</span>
+              <span>${item.type === 'image' ? '🎨 Flux' : '🎬 Seedance'}</span>
             </div>
           </div>
           <div class="card-footer" onclick="startRename(${item.id})" style="cursor: pointer;">
@@ -1537,6 +1340,7 @@
     function downloadContent(id) {
       const item = creations.find(c => c.id === id);
       if (item) {
+        // For Pollinations, we can directly download from the URL
         const a = document.createElement('a');
         a.href = item.url;
         a.download = `${item.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${item.type === 'image' ? 'jpg' : 'mp4'}`;
