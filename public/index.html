@@ -699,7 +699,7 @@
   <div class="main-container">
     <div class="hero">
       <h1>Create Stunning Visuals</h1>
-      <p>Powered by Pollinations.AI - Free, Open-Source AI Generation</p>
+      <p>Powered by DeepAI - Reliable, Fast & Affordable Generation</p>
     </div>
 
     <div class="glass-panel">
@@ -708,7 +708,7 @@
           <i class="fas fa-image"></i> Image Generation
         </button>
         <button class="mode-btn" id="vidModeBtn" onclick="switchMode('video')">
-          <i class="fas fa-video"></i> Video Generation (Seedance)
+          <i class="fas fa-video"></i> Video Generation 
         </button>
       </div>
 
@@ -1004,12 +1004,14 @@
   </div>
 
   <script>
-    // POLLINATIONS.AI API CONFIGURATION
-    // Completely free, no API keys required, open source
-    // Images: Uses Flux, Stable Diffusion, etc.
-    // Videos: Uses ByteDance Seedance, Veo
+    // DEEPAI API CONFIGURATION
+    // Reliable since 2016, less congested than Pollinations/OpenAI
+    // Free tier: $5 credit (~10,000 images), then $0.50 per 1000 requests
+    // Get your API key from: https://deepai.org/
+    // For testing/demo purposes only - replace with your actual key
     
-    const POLLINATIONS_BASE = 'https://image.pollinations.ai';
+    const DEEPAI_API_KEY = 'quickstart-QUdJIGlzIGNvbWluZy4uLi4K'; // Replace with your actual key from deepai.org
+    
     const GOOGLE_CLIENT_ID = '420462376171-hpsgp580an2douisas893bqiki92ccsv.apps.googleusercontent.com';
     const FREE_IMAGE_LIMIT = 10;
     const FREE_VIDEO_LIMIT = 5;
@@ -1026,6 +1028,11 @@
       updateHoursBadge();
       loadCreations();
       setInterval(updateHoursBadge, 60000);
+      
+      // Check if using demo key
+      if (DEEPAI_API_KEY.includes('quickstart')) {
+        console.warn('WARNING: Using demo DeepAI key. Replace with your actual API key from deepai.org for production use.');
+      }
     };
 
     function checkSession() {
@@ -1091,7 +1098,7 @@
         input.placeholder = 'Describe your image (e.g., A futuristic cyberpunk city at night)...';
       } else {
         btnText.innerHTML = 'Generate Video 🎬';
-        input.placeholder = 'Describe your video scene (e.g., A cinematic drone shot of mountains)...';
+        input.placeholder = 'Describe your video scene (e.g., A serene lake with mountains at sunset)...';
       }
       checkLimits();
     }
@@ -1139,6 +1146,12 @@
       if (!currentUser) { alert('Please sign in first!'); return; }
       if (isGenerating) return;
       
+      // Check if using demo key
+      if (DEEPAI_API_KEY.includes('quickstart')) {
+        alert('Please add your DeepAI API key first! Get a free key at deepai.org (includes $5 free credit = ~10,000 images)');
+        return;
+      }
+      
       const prompt = document.getElementById('promptInput').value.trim();
       if (!prompt) { alert('Please enter a description!'); return; }
       
@@ -1172,45 +1185,70 @@
           status: 'generating'
         };
 
-        // Build Pollinations URL
-        // For images: Default is Flux model, 1024x1024
-        // For videos: Use seedance model (ByteDance Seedance)
-        const encodedPrompt = encodeURIComponent(prompt);
-        const seed = Math.floor(Math.random() * 2147483647);
-        
-        let apiUrl;
-        
         if (currentMode === 'image') {
-          // Image generation using Flux (default) or other models
-          // Parameters: width, height, seed, model, nologo=true (to remove watermark)
-          loadingText.textContent = 'Generating image with Flux...';
-          loadingDetail.textContent = 'Connecting to Pollinations.AI...';
+          // DEEPAI TEXT-TO-IMAGE API
+          loadingText.textContent = 'Generating image with DeepAI...';
+          loadingDetail.textContent = 'Processing your request...';
           
-          apiUrl = `${POLLINATIONS_BASE}/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true&model=flux`;
+          const response = await fetch('https://api.deepai.org/api/text2img', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'api-key': DEEPAI_API_KEY
+            },
+            body: JSON.stringify({
+              text: prompt,
+              grid_size: '1' // Single image instead of grid
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.err || `HTTP ${response.status}: Failed to generate image`);
+          }
+
+          const result = await response.json();
           
-          // Pollinations returns image directly, so we use the URL as the creation URL
-          creation.url = apiUrl;
+          if (!result.output_url) {
+            throw new Error('No output URL received from API');
+          }
+          
+          creation.url = result.output_url;
           creation.status = 'ready';
           data.imagesUsed++;
           
         } else {
-          // Video generation using Seedance (ByteDance Seedance)
-          // Pollinations supports video via model=seedance or model=veo
-          loadingText.textContent = 'Generating video with Seedance...';
-          loadingDetail.textContent = 'This may take 30-60 seconds. Please wait...';
+          // DEEPAI TEXT-TO-VIDEO API
+          loadingText.textContent = 'Generating video with DeepAI...';
+          loadingDetail.textContent = 'This may take 30-60 seconds...';
           
-          // Video parameters: model=seedance, duration (5-10s), aspect ratio
-          // Note: Video generation takes longer, so we add a delay/polling if needed
-          // But Pollinations returns a video URL directly for seedance model
-          apiUrl = `${POLLINATIONS_BASE}/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true&model=seedance&duration=5&aspect_ratio=16:9`;
+          const response = await fetch('https://api.deepai.org/api/text2video', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'api-key': DEEPAI_API_KEY
+            },
+            body: JSON.stringify({
+              text: prompt,
+              duration: '5' // 5 seconds
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.err || `HTTP ${response.status}: Failed to generate video`);
+          }
+
+          const result = await response.json();
           
-          creation.url = apiUrl;
+          if (!result.output_url) {
+            throw new Error('No output URL received from API');
+          }
+          
+          creation.url = result.output_url;
           creation.status = 'ready';
           data.videosUsed++;
         }
-
-        // Simulate a brief delay to show loading state (optional, for UX)
-        await new Promise(r => setTimeout(r, currentMode === 'video' ? 3000 : 1500));
 
         saveUserData(data);
         updateCounters();
@@ -1221,7 +1259,7 @@
         
       } catch (error) {
         console.error(error);
-        alert('Error: ' + error.message);
+        alert('Error: ' + error.message + '\n\nMake sure you have a valid DeepAI API key. Get one free at deepai.org');
       } finally {
         isGenerating = false;
         document.getElementById('genBtn').disabled = false;
@@ -1262,8 +1300,8 @@
       grid.innerHTML = creations.map(item => `
         <div class="content-card" id="card-${item.id}">
           ${item.type === 'image' 
-            ? `<img src="${item.url}" class="card-media" alt="${item.prompt}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML+='<div style=\\'display:flex;align-items:center;justify-content:center;height:70%;color:#666;\\'>Image failed to load. <br>Try refreshing or check your connection.</div>';">`
-            : `<video class="card-media" controls poster="${item.url}" preload="none">
+            ? `<img src="${item.url}" class="card-media" alt="${item.prompt}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML+='<div style=\\'display:flex;align-items:center;justify-content:center;height:70%;color:#666;\\'>Image failed to load</div>';">`
+            : `<video class="card-media" controls preload="none">
                  <source src="${item.url}" type="video/mp4">
                  Your browser does not support the video tag.
                </video>`
@@ -1283,7 +1321,7 @@
             <p class="card-prompt">${escapeHtml(item.prompt)}</p>
             <div class="card-meta">
               <span>${new Date(item.timestamp).toLocaleDateString()}</span>
-              <span>${item.type === 'image' ? '🎨 Flux' : '🎬 Seedance'}</span>
+              <span>${item.type === 'image' ? '🎨 DeepAI Image' : '🎬 DeepAI Video'}</span>
             </div>
           </div>
           <div class="card-footer" onclick="startRename(${item.id})" style="cursor: pointer;">
@@ -1340,7 +1378,6 @@
     function downloadContent(id) {
       const item = creations.find(c => c.id === id);
       if (item) {
-        // For Pollinations, we can directly download from the URL
         const a = document.createElement('a');
         a.href = item.url;
         a.download = `${item.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${item.type === 'image' ? 'jpg' : 'mp4'}`;
